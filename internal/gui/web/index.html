@@ -86,7 +86,7 @@
     <button id="qbtn">Quarantine…</button>
   </div>
   <div class="card"><table>
-    <thead><tr><th style="width:34px"></th><th style="width:90px">Level</th><th>Item</th><th>Path</th><th style="width:110px;text-align:right">Size</th></tr></thead>
+    <thead><tr><th style="width:34px"><input type="checkbox" id="all" title="Select all shown"></th><th style="width:90px">Level</th><th>Item</th><th>Path</th><th style="width:110px;text-align:right">Size</th></tr></thead>
     <tbody id="rows"><tr><td colspan="5" class="empty">Click <b>Scan</b> to look for junk. Scanning never changes anything.</td></tr></tbody>
   </table></div>
   <p class="note"><b>safe</b>: regenerated automatically. <b>review</b>: regenerable but costly, or you may still want it. Items with an official clean command (npm, go, pnpm, uv) use that command, which deletes directly.</p>
@@ -188,6 +188,12 @@ function updateFooter() {
   $("selcount").textContent = sel.size;
   $("selsize").textContent = fmt(total);
   $("clean").disabled = sel.size === 0;
+  const shown = visible();
+  const picked = shown.filter((it) => sel.has(it.id)).length;
+  const all = $("all");
+  all.disabled = shown.length === 0;
+  all.checked = shown.length > 0 && picked === shown.length;
+  all.indeterminate = picked > 0 && picked < shown.length;
 }
 
 async function doScan() {
@@ -285,6 +291,11 @@ async function quarantineDialog() {
 $("scan").addEventListener("click", doScan);
 $("filter").addEventListener("change", render);
 $("q").addEventListener("input", render);
+$("all").addEventListener("change", () => {
+  const on = $("all").checked;
+  for (const it of visible()) on ? sel.add(it.id) : sel.delete(it.id);
+  render();
+});
 $("allsafe").addEventListener("click", () => { for (const it of visible()) if (it.safety === "safe") sel.add(it.id); render(); });
 $("none").addEventListener("click", () => { sel.clear(); render(); });
 $("clean").addEventListener("click", confirmDialog);

@@ -133,6 +133,14 @@ func (m model) key(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.sel[i] = !all
 				}
 			}
+		case "A": // select / unselect every item, including "review"
+			if m.selectedCount() == len(m.findings) {
+				m.sel = map[int]bool{}
+			} else {
+				for i := range m.findings {
+					m.sel[i] = true
+				}
+			}
 		case "m":
 			if m.mode == clean.Quarantine {
 				m.mode = clean.Delete
@@ -277,7 +285,7 @@ func (m model) list(b *strings.Builder) {
 		return
 	}
 	fmt.Fprintf(b, "selected: %d (%s)   mode: %s\n", m.selectedCount(), scan.FormatSize(m.selectedSize()), m.mode)
-	b.WriteString(dimSt.Render("space select · a all safe · m mode · enter clean · r rescan · q quit") + "\n")
+	b.WriteString(dimSt.Render("space select · a all safe · A all · m mode · enter clean · r rescan · q quit") + "\n")
 }
 
 func (m model) done(b *strings.Builder) {
