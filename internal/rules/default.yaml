@@ -1,0 +1,215 @@
+# devsweep built-in rules.
+#
+# safety:
+#   safe    - regenerated automatically; removing only costs a re-download/rebuild
+#   review  - regenerable but expensive, or you may still want it; look before cleaning
+#
+# paths   : %VAR%, $VAR and ~ are expanded; globs allowed. A path whose variable is
+#           unset is skipped (never resolved relative to a drive root).
+# contents: clean the children of the directory, keep the directory itself.
+# clean   : official command used instead of moving files when the binary exists.
+# artifact: project build output found under scan roots; only when the project is stale.
+
+# ---------------------------------------------------------------- OS temp / logs
+- id: user-temp
+  name: User temp files
+  description: Temporary files of the current user (in-use files are skipped).
+  safety: safe
+  contents: true
+  paths: ["%TEMP%"]
+  os: [windows]
+
+- id: crash-dumps
+  name: Crash dumps
+  description: Windows application crash dumps.
+  safety: safe
+  contents: true
+  os: [windows]
+  paths: ["%LOCALAPPDATA%\\CrashDumps"]
+
+- id: trash
+  name: Trash
+  description: Files already deleted to the desktop trash.
+  safety: safe
+  contents: true
+  os: [linux]
+  paths: ["~/.local/share/Trash/files"]
+
+- id: thumbnails
+  name: Thumbnail cache
+  description: Generated image thumbnails.
+  safety: safe
+  os: [linux]
+  paths: ["~/.cache/thumbnails"]
+
+# ---------------------------------------------------------------- package managers
+- id: npm-cache
+  name: npm cache
+  description: Downloaded npm packages.
+  safety: safe
+  paths: ["%LOCALAPPDATA%\\npm-cache", "~/.npm/_cacache"]
+  clean: ["npm", "cache", "clean", "--force"]
+
+- id: yarn-cache
+  name: Yarn cache
+  description: Downloaded Yarn packages.
+  safety: safe
+  paths: ["%LOCALAPPDATA%\\Yarn\\Cache", "~/.cache/yarn"]
+
+- id: pnpm-store
+  name: pnpm store
+  description: Shared pnpm content store; pruned with pnpm itself so linked projects keep working.
+  safety: review
+  paths: ["%LOCALAPPDATA%\\pnpm\\store", "~/.local/share/pnpm/store"]
+  clean: ["pnpm", "store", "prune"]
+
+- id: pip-cache
+  name: pip cache
+  description: Downloaded Python wheels and sdists.
+  safety: safe
+  paths: ["%LOCALAPPDATA%\\pip\\Cache", "~/.cache/pip"]
+
+- id: uv-cache
+  name: uv cache
+  description: uv package and build cache.
+  safety: safe
+  paths: ["%LOCALAPPDATA%\\uv\\cache", "~/.cache/uv"]
+  clean: ["uv", "cache", "clean"]
+
+- id: cargo-registry
+  name: Cargo registry cache
+  description: Downloaded crates and extracted sources.
+  safety: safe
+  paths: ["~/.cargo/registry/cache", "~/.cargo/registry/src"]
+
+- id: go-build-cache
+  name: Go build cache
+  description: Compiled package cache.
+  safety: safe
+  paths: ["%LOCALAPPDATA%\\go-build", "~/.cache/go-build"]
+  clean: ["go", "clean", "-cache"]
+
+- id: go-mod-cache
+  name: Go module cache
+  description: Downloaded Go modules; re-downloaded on the next build.
+  safety: review
+  paths: ["~/go/pkg/mod"]
+  clean: ["go", "clean", "-modcache"]
+
+- id: maven-repo
+  name: Maven local repository
+  description: Downloaded Maven artifacts; includes artifacts you installed locally.
+  safety: review
+  paths: ["~/.m2/repository"]
+
+- id: gradle-caches
+  name: Gradle caches
+  description: Gradle dependency and build caches.
+  safety: review
+  paths: ["~/.gradle/caches"]
+
+# ---------------------------------------------------------------- editors / browsers
+- id: vscode-cache
+  name: VS Code caches
+  description: Chromium-style caches of VS Code.
+  safety: safe
+  paths:
+    - "%APPDATA%\\Code\\Cache"
+    - "%APPDATA%\\Code\\CachedData"
+    - "%APPDATA%\\Code\\Code Cache"
+    - "%APPDATA%\\Code\\GPUCache"
+    - "~/.config/Code/Cache"
+    - "~/.config/Code/CachedData"
+    - "~/.config/Code/Code Cache"
+    - "~/.config/Code/GPUCache"
+
+- id: jetbrains-caches
+  name: JetBrains IDE caches
+  description: Index and system caches; IDEs re-index on next start.
+  safety: review
+  paths: ["%LOCALAPPDATA%\\JetBrains\\*\\caches", "~/.cache/JetBrains/*"]
+
+- id: chrome-cache
+  name: Chrome cache
+  description: Browser disk cache (does not touch cookies or passwords).
+  safety: safe
+  paths:
+    - "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Cache"
+    - "%LOCALAPPDATA%\\Google\\Chrome\\User Data\\Default\\Code Cache"
+    - "~/.cache/google-chrome/Default/Cache"
+
+- id: edge-cache
+  name: Edge cache
+  description: Browser disk cache (does not touch cookies or passwords).
+  safety: safe
+  paths:
+    - "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Cache"
+    - "%LOCALAPPDATA%\\Microsoft\\Edge\\User Data\\Default\\Code Cache"
+
+# ---------------------------------------------------------------- AI coding tools
+- id: claude-old-binaries
+  name: Old Claude Code binaries
+  description: Leftovers of previous Claude Code auto-updates.
+  safety: safe
+  paths: ["~/.local/bin/claude.exe.old.*", "~/.local/bin/claude.old.*"]
+
+- id: claude-debug
+  name: Claude Code debug logs
+  description: Debug logs and caches of Claude Code.
+  safety: safe
+  paths: ["~/.claude/debug", "~/.claude/cache", "~/.claude/paste-cache"]
+
+- id: opencode-logs
+  name: opencode logs and tool output
+  description: Logs and saved tool output of opencode.
+  safety: safe
+  paths: ["~/.local/share/opencode/log", "~/.local/share/opencode/tool-output"]
+
+- id: opencode-snapshots
+  name: opencode snapshots
+  description: File snapshots opencode keeps to undo changes.
+  safety: review
+  paths: ["~/.local/share/opencode/snapshot"]
+
+- id: codex-logs
+  name: Codex logs
+  description: Codex CLI logs and temp files.
+  safety: safe
+  paths: ["~/.codex/log", "~/.codex/.tmp", "~/.codex/tmp"]
+
+# ---------------------------------------------------------------- project build output
+- id: node-modules
+  name: Stale node_modules
+  description: node_modules of projects whose package.json has not changed for a while; npm install restores it.
+  safety: review
+  artifact:
+    dir: node_modules
+    markers: [package.json]
+    stale_days: 30
+
+- id: rust-target
+  name: Stale Rust target/
+  description: Cargo build output of projects untouched for a while; rebuilt by cargo build.
+  safety: review
+  artifact:
+    dir: target
+    markers: [Cargo.toml]
+    stale_days: 30
+
+- id: next-build
+  name: Stale .next build
+  description: Next.js build output of projects untouched for a while.
+  safety: review
+  artifact:
+    dir: .next
+    markers: [package.json]
+    stale_days: 30
+
+- id: python-venv
+  name: Stale Python .venv
+  description: Virtualenvs of projects untouched for a while; recreate from requirements.
+  safety: review
+  artifact:
+    dir: .venv
+    markers: [pyproject.toml, requirements.txt]
+    stale_days: 60
