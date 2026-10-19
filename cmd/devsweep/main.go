@@ -12,8 +12,10 @@ import (
 
 	"devsweep/internal/clean"
 	"devsweep/internal/config"
+	"devsweep/internal/gui"
 	"devsweep/internal/rules"
 	"devsweep/internal/scan"
+	"devsweep/internal/setup"
 	"devsweep/internal/tui"
 )
 
@@ -21,6 +23,7 @@ const usage = `devsweep - find and clean developer-machine junk
 
 Usage:
   devsweep                 interactive TUI (same as "devsweep tui")
+  devsweep gui   [flags]   GUI in your browser (the desktop app is devsweep-gui)
   devsweep scan  [flags]   list what could be cleaned (read-only)
   devsweep clean [flags]   dry-run by default; add --yes to apply
   devsweep restore [batch] list quarantine batches / restore one
@@ -65,6 +68,8 @@ func main() {
 		err = runRestore(args)
 	case "purge":
 		err = runPurge(args)
+	case "gui":
+		err = runGUI(args)
 	case "rules":
 		err = runRules()
 	case "help":
@@ -79,53 +84,24 @@ func main() {
 	}
 }
 
-func setup(c common) ([]rules.Rule, scan.Options, error) {
-	rs, err := rules.Load(config.RulesFile())
-	if err != nil {
-		return nil, scan.Options{}, err
-	}
-	cfg, err := config.Load()
-	if err != nil {
-		return nil, scan.Options{}, err
-	}
-	roots := cfg.Roots
-	if c.roots != "" {
-		roots = splitList(c.roots)
-	}
-	if len(roots) == 0 {
-		roots = config.DefaultRoots()
-	}
-	for i, r := range roots {
-		if e := rules.Expand(r); e != "" {
-			roots[i] = e
-		}
-	}
-	allowSafety := map[string]bool{}
-	for _, s := range splitList(c.safety) {
-		allowSafety[s] = true
-	}
-	only := map[string]bool{}
-	for _, s := range splitList(c.only) {
-		only[s] = true
-	}
-	var filtered []rules.Rule
-	for _, r := range rs {
-		if !allowSafety[string(r.Safety)] || (len(only) > 0 && !only[r.ID]) {
-			continue
-		}
-		filtered = append(filtered, r)
-	}
-	return filtered, scan.Options{Roots: roots}, nil
+func setupFrom(c common) ([]rules.Rule, scan.Options, error) {
+	return setup.Load(c.roots, c.safety, c.only)
 }
 
-func splitList(s string) []string {
-	var out []string
-	for _, p := range strings.Split(s, ",") {
-		if p = strings.TrimSpace(p); p != "" {
-			out = append(out, p)
-		}
+func runGUI(args []string) error {
+	var c common
+	var port int
+	var noOpen bool
+	fs := flag.NewFlagSet("gui", flag.ExitOnError)
+	c.bind(fs)
+	fs.IntVar(&port, "port", 0, "")
+	fs.BoolVar(&noOpen, "no-open", false, "")
+	fs.Parse(args)
+	rs, opts, err := setupFrom(c)
+	if err != nil {
+		return err
 	}
-	return out
+	return gui.Run(rs, opts, port, !noOpen)
 }
 
 func runTUI(args []string) error {
@@ -133,7 +109,7 @@ func runTUI(args []string) error {
 	fs := flag.NewFlagSet("tui", flag.ExitOnError)
 	c.bind(fs)
 	fs.Parse(args)
-	rs, opts, err := setup(c)
+	rs, opts, err := setupFrom(c)
 	if err != nil {
 		return err
 	}
@@ -147,7 +123,7 @@ func runScan(args []string) error {
 	c.bind(fs)
 	fs.BoolVar(&asJSON, "json", false, "")
 	fs.Parse(args)
-	rs, opts, err := setup(c)
+	rs, opts, err := setupFrom(c)
 	if err != nil {
 		return err
 	}
@@ -186,7 +162,7 @@ func runClean(args []string) error {
 	fs.BoolVar(&yes, "yes", false, "")
 	fs.BoolVar(&del, "delete", false, "")
 	fs.Parse(args)
-	rs, opts, err := setup(c)
+	rs, opts, err := setupFrom(c)
 	if err != nil {
 		return err
 	}

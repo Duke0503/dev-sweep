@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>devsweep</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1c2026; --dim: #6b7380; --line: #e3e6eb;
+    --accent: #2563eb; --safe: #15803d; --safe-bg: #dcfce7; --review: #a16207; --review-bg: #fef3c7;
+    --danger: #b91c1c; --bar: #c7d2fe;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1216; --panel: #171b21; --text: #e6e9ee; --dim: #8b94a3; --line: #272d36;
+      --accent: #60a5fa; --safe: #4ade80; --safe-bg: #14301f; --review: #fbbf24; --review-bg: #33280b;
+      --danger: #f87171; --bar: #26324f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 18px 24px 8px; }
+  h1 { font-size: 20px; margin: 0; }
+  .sub { color: var(--dim); }
+  main { padding: 8px 24px 96px; max-width: 1200px; margin: 0 auto; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0 12px; }
+  button, select, input[type=search] {
+    font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; padding: 7px 12px;
+  }
+  button { cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--danger); }
+  .grow { flex: 1; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+  th { color: var(--dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  tr:last-child td { border-bottom: 0; }
+  tr.row { cursor: pointer; }
+  tr.row:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  td.size { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td.path { word-break: break-all; color: var(--dim); font-size: 12px; }
+  .name { font-weight: 500; }
+  .desc { color: var(--dim); font-size: 12px; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; }
+  .badge.safe { color: var(--safe); background: var(--safe-bg); }
+  .badge.review { color: var(--review); background: var(--review-bg); }
+  .bar { height: 4px; border-radius: 2px; background: var(--bar); margin-top: 5px; }
+  .note { color: var(--dim); font-size: 12px; margin: 10px 2px; }
+  .empty { padding: 36px; text-align: center; color: var(--dim); }
+  footer {
+    position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line);
+    padding: 12px 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .toast { position: fixed; top: 16px; right: 16px; max-width: 420px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px; box-shadow: 0 8px 28px rgba(0,0,0,.18); }
+  .toast.err { border-color: var(--danger); }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); max-width: 520px; padding: 20px; }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  .results { max-height: 260px; overflow: auto; font-size: 12px; margin: 10px 0; }
+  .results div { padding: 3px 0; word-break: break-all; }
+  .bad { color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <h1>devsweep</h1><span class="sub">dev-focused disk cleaner</span>
+  <span class="grow"></span>
+  <span class="sub" id="roots"></span>
+</header>
+<main>
+  <div class="toolbar">
+    <button id="scan" class="primary">Scan</button>
+    <select id="filter">
+      <option value="all">All levels</option>
+      <option value="safe">Safe only</option>
+      <option value="review">Review only</option>
+    </select>
+    <input id="q" type="search" placeholder="Filter by name or path">
+    <button id="allsafe">Select all safe</button>
+    <button id="none">Clear selection</button>
+    <span class="grow"></span>
+    <button id="qbtn">Quarantine…</button>
+  </div>
+  <div class="card"><table>
+    <thead><tr><th style="width:34px"></th><th style="width:90px">Level</th><th>Item</th><th>Path</th><th style="width:110px;text-align:right">Size</th></tr></thead>
+    <tbody id="rows"><tr><td colspan="5" class="empty">Click <b>Scan</b> to look for junk. Scanning never changes anything.</td></tr></tbody>
+  </table></div>
+  <p class="note"><b>safe</b>: regenerated automatically. <b>review</b>: regenerable but costly, or you may still want it. Items with an official clean command (npm, go, pnpm, uv) use that command, which deletes directly.</p>
+</main>
+
+<footer>
+  <div><b id="selcount">0</b> selected · <b id="selsize">0 B</b></div>
+  <span class="grow"></span>
+  <label><input type="checkbox" id="perm"> delete permanently (skip quarantine)</label>
+  <button id="clean" class="primary" disabled>Clean selected…</button>
+</footer>
+
+<dialog id="dlg"></dialog>
+<div id="toast" class="toast" hidden></div>
+
+<script>
+"use strict";
+const token = new URLSearchParams(location.search).get("t") || "";
+history.replaceState(null, "", location.pathname);
+
+const $ = (id) => document.getElementById(id);
+let items = [];
+const sel = new Set();
+
+function fmt(n) {
+  if (n < 1024) return n + " B";
+  const u = ["KiB", "MiB", "GiB", "TiB"];
+  let i = -1;
+  do { n /= 1024; i++; } while (n >= 1024 && i < u.length - 1);
+  return n.toFixed(1) + " " + u[i];
+}
+
+async function api(path, body) {
+  const res = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "X-Devsweep-Token": token, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+function toast(msg, isErr) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.className = "toast" + (isErr ? " err" : "");
+  t.hidden = false;
+  clearTimeout(toast.h);
+  toast.h = setTimeout(() => { t.hidden = true; }, isErr ? 8000 : 4000);
+}
+
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  Object.assign(e, props || {});
+  for (const k of kids) e.append(k);
+  return e;
+}
+
+function visible() {
+  const lvl = $("filter").value, q = $("q").value.trim().toLowerCase();
+  return items.filter((it) =>
+    (lvl === "all" || it.safety === lvl) &&
+    (!q || (it.name + " " + it.path + " " + it.rule).toLowerCase().includes(q)));
+}
+
+function render() {
+  const rows = $("rows");
+  rows.replaceChildren();
+  const list = visible();
+  if (!list.length) {
+    rows.append(el("tr", {}, Object.assign(el("td", { className: "empty" }, items.length ? "No items match the filter." : "Nothing to clean."), { colSpan: 5 })));
+  }
+  const max = Math.max(1, ...list.map((i) => i.size));
+  for (const it of list) {
+    const cb = el("input", { type: "checkbox", checked: sel.has(it.id) });
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", () => toggle(it.id, cb.checked));
+    const bar = el("div", { className: "bar" });
+    bar.style.width = Math.max(2, Math.round(100 * it.size / max)) + "%";
+    const name = el("div", { className: "name" }, it.name + (it.stale_days ? ` (stale ${it.stale_days}d)` : ""));
+    const tr = el("tr", { className: "row" },
+      el("td", {}, cb),
+      el("td", {}, el("span", { className: "badge " + it.safety }, it.safety)),
+      el("td", {}, name, el("div", { className: "desc" }, it.description + (it.command ? " · uses official command" : "")), bar),
+      el("td", { className: "path" }, it.path),
+      el("td", { className: "size" }, fmt(it.size)));
+    tr.addEventListener("click", () => { cb.checked = !cb.checked; toggle(it.id, cb.checked); });
+    rows.append(tr);
+  }
+  updateFooter();
+}
+
+function toggle(id, on) { on ? sel.add(id) : sel.delete(id); updateFooter(); }
+
+function updateFooter() {
+  let total = 0;
+  for (const it of items) if (sel.has(it.id)) total += it.size;
+  $("selcount").textContent = sel.size;
+  $("selsize").textContent = fmt(total);
+  $("clean").disabled = sel.size === 0;
+}
+
+async function doScan() {
+  const b = $("scan");
+  b.disabled = true; b.textContent = "Scanning…";
+  try {
+    const d = await api("/api/scan");
+    items = d.items || [];
+    sel.clear();
+    $("roots").textContent = "project roots: " + (d.roots || []).join(", ");
+    render();
+    const total = items.reduce((s, i) => s + i.size, 0);
+    toast(`${items.length} items, ${fmt(total)} reclaimable`);
+  } catch (e) { toast(e.message, true); }
+  b.disabled = false; b.textContent = "Scan";
+}
+
+function confirmDialog() {
+  const perm = $("perm").checked;
+  let total = 0;
+  const chosen = items.filter((i) => sel.has(i.id));
+  for (const it of chosen) total += it.size;
+  const d = $("dlg");
+  d.replaceChildren(
+    el("h3", {}, `Clean ${chosen.length} items (${fmt(total)})?`),
+    el("p", {}, perm
+      ? "They will be DELETED PERMANENTLY. This cannot be undone."
+      : "They will be moved to quarantine. You can restore them, and space is freed after Purge."),
+    Object.assign(el("div", { className: "results" }), {}),
+  );
+  const list = d.querySelector(".results");
+  for (const it of chosen) list.append(el("div", {}, `${it.name} — ${it.path}`));
+  const ok = el("button", { className: "primary" + (perm ? " danger" : ""), textContent: "Clean" });
+  const cancel = el("button", { textContent: "Cancel" });
+  cancel.addEventListener("click", () => d.close());
+  ok.addEventListener("click", async () => {
+    ok.disabled = true; ok.textContent = "Cleaning…";
+    try {
+      const r = await api("/api/clean", { ids: chosen.map((i) => i.id), mode: perm ? "delete" : "quarantine" });
+      showResults(r.results);
+    } catch (e) { d.close(); toast(e.message, true); }
+  });
+  d.append(el("div", { style: "display:flex;gap:8px;justify-content:flex-end" }, cancel, ok));
+  d.showModal();
+}
+
+function showResults(results) {
+  const d = $("dlg");
+  const bad = results.filter((r) => r.error);
+  const freed = results.filter((r) => !r.error).reduce((s, r) => s + r.size, 0);
+  d.replaceChildren(el("h3", {}, `${results.length - bad.length} cleaned, ${bad.length} failed (${fmt(freed)} processed)`));
+  const list = el("div", { className: "results" });
+  for (const r of results) {
+    const parts = [r.error ? "✗" : "✓", r.name, r.method ? `via ${r.method}` : ""];
+    if (r.skipped) parts.push(`${r.skipped} skipped (in use)`);
+    if (r.error) parts.push(r.error);
+    list.append(el("div", { className: r.error ? "bad" : "" }, parts.filter(Boolean).join(" · ")));
+  }
+  const close = el("button", { className: "primary", textContent: "Close" });
+  close.addEventListener("click", () => { d.close(); doScan(); });
+  d.append(list, el("div", { style: "text-align:right" }, close));
+}
+
+async function quarantineDialog() {
+  const d = $("dlg");
+  try {
+    const q = await api("/api/quarantine");
+    d.replaceChildren(el("h3", {}, "Quarantine"), el("p", {}, `${q.batches.length} batches, ${fmt(q.size)} on disk.`));
+    const list = el("div", { className: "results" });
+    for (const b of q.batches) {
+      const btn = el("button", { textContent: "Restore" });
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try { const r = await api("/api/restore", { batch: b }); toast(`restored ${r.restored}, skipped ${r.skipped}`); }
+        catch (e) { toast(e.message, true); }
+      });
+      list.append(el("div", {}, b + "  ", btn));
+    }
+    const purge = el("button", { className: "danger", textContent: "Purge all (permanent)", disabled: !q.batches.length });
+    purge.addEventListener("click", async () => {
+      if (!purge.dataset.armed) {
+        purge.dataset.armed = "1";
+        purge.textContent = "Click again to delete permanently";
+        return;
+      }
+      try { const r = await api("/api/purge", {}); toast("freed " + fmt(r.freed)); d.close(); } catch (e) { toast(e.message, true); }
+    });
+    const close = el("button", { textContent: "Close" });
+    close.addEventListener("click", () => d.close());
+    d.append(list, el("div", { style: "display:flex;gap:8px;justify-content:space-between" }, purge, close));
+    d.showModal();
+  } catch (e) { toast(e.message, true); }
+}
+
+$("scan").addEventListener("click", doScan);
+$("filter").addEventListener("change", render);
+$("q").addEventListener("input", render);
+$("allsafe").addEventListener("click", () => { for (const it of visible()) if (it.safety === "safe") sel.add(it.id); render(); });
+$("none").addEventListener("click", () => { sel.clear(); render(); });
+$("clean").addEventListener("click", confirmDialog);
+$("qbtn").addEventListener("click", quarantineDialog);
+doScan();
+</script>
+</body>
+</html>

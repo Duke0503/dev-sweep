@@ -3,16 +3,11 @@
 CLI + TUI that finds junk on a developer machine (package caches, stale `node_modules`/`target/`,
 old tool binaries, logs, temp files) and cleans it safely. Windows and Linux. Written in Go.
 
-## Build
-
-```
-go build -o bin/devsweep ./cmd/devsweep                         # current OS
-GOOS=linux GOARCH=amd64 go build -o bin/devsweep-linux ./cmd/devsweep   # cross-compile for Ubuntu
-```
-
 ## Usage
 
 ```
+devsweep-gui              desktop app (separate binary)
+devsweep gui              same UI in your browser (loopback + token)
 devsweep                  interactive TUI
 devsweep scan             list findings (read-only)
 devsweep clean            dry-run
