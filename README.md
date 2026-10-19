@@ -3,6 +3,16 @@
 CLI + TUI that finds junk on a developer machine (package caches, stale `node_modules`/`target/`,
 old tool binaries, logs, temp files) and cleans it safely. Windows and Linux. Written in Go.
 
+## Build
+
+```
+.\build.ps1       # Windows: bin\devsweep.exe (CLI/TUI) + bin\devsweep-gui.exe (desktop app)
+./build.sh        # Ubuntu (desktop app needs libgtk-3-dev libwebkit2gtk-4.1-dev)
+```
+
+The desktop app uses the OS WebView (WebView2 on Windows, WebKitGTK on Linux) through Wails.
+Windows is verified; the Linux build is untested.
+
 ## Usage
 
 ```
